@@ -167,27 +167,37 @@ function __grunt_update_cache() {
         is_updating=1
         grunt_info=$(grunt --help --no-color --gruntfile "$__grunt_gruntfile" 2>/dev/null)
         __grunt_opts=(${(f)"$(__grunt_get_opts "$grunt_info")"})
-        __grunt_tasks=(${(f)"$(__grunt_get_alias_tasks "$__grunt_gruntfile")"} ${(f)"$(__grunt_get_principal_tasks "$__grunt_gruntfile")"})
+        __grunt_tasks=(${(f)"$(__grunt_get_tasks "$grunt_info")"})
         _store_cache 'grunt' __grunt_version __grunt_gruntfile __grunt_opts __grunt_tasks
     fi
     return $is_updating
 }
 
-function __grunt_get_principal_tasks() {
-    grunt --help --no-color --gruntfile "$1" 2>/dev/null \
+function __grunt_get_tasks() {
+    echo -E "$1" \
         | grep 'Available tasks' -A 100 \
         | grep '^ ' \
-		| grep '\*\s*$' \
-        | sed -e 's/^[[:blank:]]*//' -e 's/[[:blank:]]*$//' \
-        | sed -e 's/  /:/'
-}
-
-function __grunt_get_alias_tasks() {
-    grunt --help --no-color --gruntfile "$1" 2>/dev/null \
-        | grep 'Available tasks' -A 100 \
-        | grep '^ ' \
-		| grep -E 'Alias|\.\s*$' \
-		| grep -v '^\s*"' \
+        | awk 'BEGIN { j=0 }
+            $1 !~ /^\s*"/ { memtask[j] = $0; j++; }
+            {
+                for (i=1; i <= NF; i++) {
+                    if ($i ~ /^"(\w+:\w+)"$/) {
+                        val = gensub(/^"(\w+):(\w+)"$/,"\\1 \\2","", $i) ;
+                        gsub(" ", "\\:", val);
+                        memtask[j] = val ;
+                        j++;
+                    }
+                }
+            }
+            END {
+                print task
+                for ( k in memtask ) {
+                    if (memtask[k] != "") {
+                        print memtask[k];
+                    }
+                }
+            }' \
+        | sed -e '/^$/d' \
         | sed -e 's/^[[:blank:]]*//' -e 's/[[:blank:]]*$//' \
         | sed -e 's/  /:/'
 }
